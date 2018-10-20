@@ -1,0 +1,195 @@
+{
+  "Servers" : [ {
+    "Category" : 0,
+    "DomainOrIP" : "188.166.83.206",
+    "Flag" : "sg",
+    "Name" : "Server 1"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "165.227.25.27",
+    "Flag" : "sg",
+    "Name" : "Server 2"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "159.203.57.77",
+    "Flag" : "us",
+    "Name" : "Server 3"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "128.129.81.111",
+    "Flag" : "ad",
+    "Name" : "Server 4"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "165.227.33.135",
+    "Flag" : "ad",
+    "Name" : "Server 5"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "165.227.34.240",
+    "Flag" : "ad",
+    "Name" : "Server 6"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "159.89.118.9",
+    "Flag" : "ad",
+    "Name" : "Server 7"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "159.89.118.241",
+    "Flag" : "ad",
+    "Name" : "Server 8"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "46.101.188.177",
+    "Flag" : "ad",
+    "Name" : "Server 9"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "159.65.19.204",
+    "Flag" : "ad",
+    "Name" : "Server 10"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "159.65.158.74",
+    "Flag" : "ad",
+    "Name" : "Server 11"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "167.99.234.241",
+    "Flag" : "ad",
+    "Name" : "Server 12"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "138.68.110.5",
+    "Flag" : "ad",
+    "Name" : "Server 13"
+  }, {
+    "Category" : 0,
+    "DomainOrIP" : "206.189.4.246",
+    "Flag" : "ad",
+    "Name" : "Server 14"
+  } ],
+  "Payloads" : [ {
+    "Format" : 1,
+    "ForwardHost" : false,
+    "FullHost" : false,
+    "Host" : "vt3xYYdHV+pt7f22G9cHBaIhXVFy3wItR2SeaNOX+HHn/r8GnBBJInhw5QugO0TFkdSa68KkaT0TsD+rZkasAg==",
+    "Name" : "Twitter Mobile",
+    "OnlineHost" : true,
+    "Port" : 8080,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 1,
+    "ForwardHost" : false,
+    "FullHost" : false,
+    "Host" : "960dLjpn4j0aKnr5ocsXuODGprcPtYeyolWHcxtjQrQbdY8ZRt28DRQ4pHpD68w+",
+    "Name" : "Baba1",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 2,
+    "ForwardHost" : false,
+    "FullHost" : false,
+    "Host" : "yTBJYmHvRNTGMA3BTjQPzG6cidJRZDcHIAn4tNDvFsJ0yurL1fPbuPmRYhtPdJJe",
+    "Name" : "Wechat",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 1,
+    "ForwardHost" : true,
+    "FullHost" : false,
+    "Host" : "mz7ZZwZW/uTfTpdLCVSVDaZeIvUT2ee37bZRjB/pXdfxwWbz+xoxnM+4idnoZvZt",
+    "Name" : "Twitter",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 1,
+    "ForwardHost" : true,
+    "FullHost" : false,
+    "Host" : "01dzSWblQdLKow2B9WdN7K+jMtICaaeSCfJBpxUEHKGwRMYfCFG471Dd7KLWbbqeP+KzlRkGSfdGeggJLZrrlA==",
+    "Name" : "Payload 1",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 1,
+    "ForwardHost" : true,
+    "FullHost" : false,
+    "Host" : "Vl2VGWkdxc9yM4IAmKs+UOlRmsSVOA57Zf0mNkXKI84JpAcCqymq7kupHecRuRzf",
+    "Name" : "Payload 2",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 1,
+    "ForwardHost" : true,
+    "FullHost" : false,
+    "Host" : "7a4yZTR+Jx7McFD2yYoZRFZMBu/pA6rXSP2qtntU4gI=",
+    "Name" : "Payload 3",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 3,
+    "ForwardHost" : true,
+    "FullHost" : false,
+    "Host" : "+ATk0xF65cNwcHldsXAs7CNsd/QurUyrRUnmQfHyekfZtfbTCLjZoCQ3mecWG7cI",
+    "Name" : "Social Pack",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : false,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  }, {
+    "Format" : 2,
+    "ForwardHost" : false,
+    "FullHost" : false,
+    "Host" : "xw1JfDi/JGrvcTzd4FEnw98A2RElTjiXtMDGyAydOJj0dA5tkoVdZ60qAOirVpRILV+YxUmdv1O5HbQX4uwuUA==",
+    "Name" : "Social pack 2",
+    "OnlineHost" : true,
+    "Port" : 3128,
+    "Proxy" : "",
+    "ReverseProxy" : true,
+    "ShowText" : false,
+    "Text" : "",
+    "UseDefaultProxy" : true
+  } ],
+  "GuiCategories" : true,
+  "GuiFlags" : false,
+  "Changelogs" : "<strong>What's New?</strong><br><br>",
+  "Version" : 1.6
+}
